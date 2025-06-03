@@ -86,7 +86,7 @@ const App: React.FC = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const welcomeSpokenRef = useRef(false);
-
+ const apiBaseUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
@@ -173,12 +173,15 @@ const App: React.FC = () => {
     abortControllerRef.current = controller;
 
     try {
-      const res = await fetch('http://localhost:5000/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question }),
-        signal: controller.signal,
-      });
+    
+
+const res = await fetch(`${apiBaseUrl}/ask`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ question }),
+  signal: controller.signal,
+});
+;
 
       if (!res.ok) throw new Error('Fetch error');
 
