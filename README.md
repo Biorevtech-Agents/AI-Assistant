@@ -1,3 +1,4 @@
+Project Title
 AI Assistant
 Overview
 This project is an AI-powered voice assistant integrated with screen capture capabilities. The backend uses Node.js and TypeScript with OpenAI's API for AI responses, while the frontend is built with React, supporting voice input, markdown rendering, and dynamic conversational UI.
