@@ -122,7 +122,7 @@ const MessageComponent = React.memo(({ message }: { message: Message }) => {
         style={{
           backgroundColor: sender === 'user' ? '#2563eb' : '#f8fafc',
           color: sender === 'user' ? '#fff' : '#1e293b',
-          padding: '16px 20px',
+          padding: '10px 10px',
           borderRadius: '16px',
           maxWidth: '75%',
           boxShadow: sender === 'user' 
