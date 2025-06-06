@@ -331,6 +331,7 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [isContinuousTalk, setIsContinuousTalk] = useState(false);
   const [sentFromVoice, setSentFromVoice] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -343,6 +344,7 @@ const App: React.FC = () => {
   const [stopButtonHovered, setStopButtonHovered] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const getCurrentChat = () => {
     return chats.find(chat => chat.id === activeChat) || chats[0];
@@ -537,17 +539,40 @@ const App: React.FC = () => {
   };
 
   const handleVoiceResult = (text: string) => {
-    setInput(text);
-    setSentFromVoice(true);
-    setIsListening(false);
+    if (text.trim()) {
+      setInput(text);
+      setSentFromVoice(true);
+      if (isContinuousTalk) {
+        sendQuestion(text);
+        setInput('');
+        setSentFromVoice(false);
+      } else {
+        setIsListening(false);
+      }
+    }
   };
 
   const handleListeningChange = (listening: boolean) => {
     setIsListening(listening);
-    if (!listening && input.trim() && sentFromVoice) {
+    if (!listening && input.trim() && sentFromVoice && !isContinuousTalk) {
       sendQuestion(input.trim());
       setInput('');
       setSentFromVoice(false);
+    }
+  };
+
+  const handleContinuousTalkChange = (continuous: boolean) => {
+    setIsContinuousTalk(continuous);
+    if (!continuous) {
+      setIsListening(false);
+      setSentFromVoice(false);
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (error) {
+          console.error('Error stopping recognition:', error);
+        }
+      }
     }
   };
 
@@ -740,7 +765,13 @@ const App: React.FC = () => {
               }}
               disabled={loading}
             />
-            <VoiceInput onResult={handleVoiceResult} listening={isListening} onListeningChange={handleListeningChange} />
+            <VoiceInput 
+              onResult={handleVoiceResult} 
+              listening={isListening} 
+              onListeningChange={handleListeningChange}
+              continuousTalk={isContinuousTalk}
+              onContinuousTalkChange={handleContinuousTalkChange}
+            />
           </motion.div>
 
           <motion.button

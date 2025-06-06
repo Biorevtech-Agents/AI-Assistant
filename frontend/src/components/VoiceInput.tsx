@@ -4,6 +4,8 @@ interface VoiceInputProps {
   onResult: (text: string) => void;
   listening: boolean;
   onListeningChange: (listening: boolean) => void;
+  continuousTalk: boolean;
+  onContinuousTalkChange: (continuous: boolean) => void;
 }
 // Inline SVG Mic Icons
 const MicOnIcon = () => (
@@ -35,7 +37,27 @@ const MicOffIcon = () => (
   </svg>
 );
 
-const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListeningChange }) => {
+// New Talk Icon
+const TalkIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    height="20"
+    width="20"
+    viewBox="0 0 24 24"
+    fill="white"
+  >
+    <path d="M12 3C7.03 3 3 7.03 3 12s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+    <path d="M10 8l6 4-6 4V8z"/>
+  </svg>
+);
+
+const VoiceInput: React.FC<VoiceInputProps> = ({ 
+  onResult, 
+  listening, 
+  onListeningChange,
+  continuousTalk,
+  onContinuousTalkChange
+}) => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const isRecognitionActiveRef = useRef<boolean>(false);
 
@@ -47,15 +69,17 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListenin
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = continuousTalk;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const transcript = event.results[0][0].transcript;
+      const transcript = event.results[event.results.length - 1][0].transcript;
       onResult(transcript);
-      isRecognitionActiveRef.current = false;
-      onListeningChange(false);
+      if (!continuousTalk) {
+        isRecognitionActiveRef.current = false;
+        onListeningChange(false);
+      }
     };
 
     recognition.onstart = () => {
@@ -64,8 +88,18 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListenin
     };
 
     recognition.onend = () => {
-      isRecognitionActiveRef.current = false;
-      onListeningChange(false);
+      if (continuousTalk && isRecognitionActiveRef.current) {
+        try {
+          recognition.start();
+        } catch (error) {
+          console.error('Error restarting recognition:', error);
+          isRecognitionActiveRef.current = false;
+          onListeningChange(false);
+        }
+      } else {
+        isRecognitionActiveRef.current = false;
+        onListeningChange(false);
+      }
     };
 
     recognition.onerror = (event: ErrorEvent) => {
@@ -76,7 +110,6 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListenin
 
     recognitionRef.current = recognition;
 
-    // Cleanup function
     return () => {
       if (recognitionRef.current) {
         try {
@@ -86,7 +119,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListenin
         }
       }
     };
-  }, [onResult, onListeningChange]);
+  }, [onResult, onListeningChange, continuousTalk]);
 
   useEffect(() => {
     if (listening && !isRecognitionActiveRef.current) {
@@ -105,7 +138,24 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListenin
     }
   }, [listening, onListeningChange]);
 
+  // Add effect to handle continuous talk mode changes
+  useEffect(() => {
+    if (continuousTalk && !isRecognitionActiveRef.current) {
+      try {
+        recognitionRef.current?.start();
+      } catch (error) {
+        console.error('Error starting continuous recognition:', error);
+        onContinuousTalkChange(false);
+      }
+    }
+  }, [continuousTalk, onContinuousTalkChange]);
+
   const toggleListening = () => {
+    if (continuousTalk) {
+      // If continuous talk is active, don't allow regular mic toggle
+      return;
+    }
+    
     if (isRecognitionActiveRef.current) {
       try {
         recognitionRef.current?.stop();
@@ -116,27 +166,64 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListenin
     onListeningChange(!listening);
   };
 
+  const toggleContinuousTalk = () => {
+    if (isRecognitionActiveRef.current) {
+      try {
+        recognitionRef.current?.stop();
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
+    }
+    onContinuousTalkChange(!continuousTalk);
+  };
+
   return (
-    <button
-      onClick={toggleListening}
-      style={{
-        backgroundColor: listening ? '#f44336' : '#4caf50',
-        border: 'none',
-        borderRadius: 20,
-        padding: '8px 14px',
-        marginLeft: 8,
-        cursor: 'pointer',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 50,
-        height: 40,
-      }}
-      title={listening ? 'Stop Listening' : 'Start Listening'}
-      aria-label={listening ? 'Stop Listening' : 'Start Listening'}
-    >
-      {listening ? <MicOffIcon /> : <MicOnIcon />}
-    </button>
+    <div style={{ display: 'flex', gap: '8px' }}>
+      <button
+        onClick={toggleContinuousTalk}
+        style={{
+          backgroundColor: continuousTalk ? '#f44336' : '#2196f3',
+          border: 'none',
+          borderRadius: 20,
+          padding: '8px 14px',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 50,
+          height: 40,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          transition: 'all 0.3s ease',
+        }}
+        title={continuousTalk ? 'Stop Continuous Talk' : 'Start Continuous Talk'}
+        aria-label={continuousTalk ? 'Stop Continuous Talk' : 'Start Continuous Talk'}
+      >
+        <TalkIcon />
+      </button>
+      <button
+        onClick={toggleListening}
+        style={{
+          backgroundColor: listening ? '#f44336' : '#4caf50',
+          border: 'none',
+          borderRadius: 20,
+          padding: '8px 14px',
+          cursor: continuousTalk ? 'not-allowed' : 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 50,
+          height: 40,
+          opacity: continuousTalk ? 0.5 : 1,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+          transition: 'all 0.3s ease',
+        }}
+        title={continuousTalk ? 'Disabled during continuous talk' : (listening ? 'Stop Listening' : 'Start Listening')}
+        aria-label={continuousTalk ? 'Disabled during continuous talk' : (listening ? 'Stop Listening' : 'Start Listening')}
+        disabled={continuousTalk}
+      >
+        {listening ? <MicOffIcon /> : <MicOnIcon />}
+      </button>
+    </div>
   );
 };
 
