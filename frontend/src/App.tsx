@@ -444,10 +444,28 @@ const App: React.FC = () => {
   };
 
   const handleDeleteChat = (chatId: string) => {
-    setChats(prev => prev.filter(chat => chat.id !== chatId));
-    if (activeChat === chatId) {
-      setActiveChat(chats[0].id);
-    }
+    setChats(prev => {
+      const updatedChats = prev.filter(chat => chat.id !== chatId);
+      if (updatedChats.length === 0) {
+        // If all chats are deleted, create a new one
+        const newChat: Chat = {
+          id: uuidv4(),
+          title: 'New Chat',
+          timestamp: new Date(),
+          messages: [{ id: 1, sender: 'bot', text: welcomeText }]
+        };
+        return [newChat];
+      }
+      return updatedChats;
+    });
+    setActiveChat(prevActiveChat => {
+      if (prevActiveChat === chatId) {
+        // If the deleted chat was active, set the first remaining chat as active
+        const firstRemainingChat = chats.find(chat => chat.id !== chatId);
+        return firstRemainingChat?.id || chats[0]?.id;
+      }
+      return prevActiveChat;
+    });
   };
 
   const stopResponse = () => {
