@@ -5,7 +5,6 @@ interface VoiceInputProps {
   listening: boolean;
   onListeningChange: (listening: boolean) => void;
 }
-
 // Inline SVG Mic Icons
 const MicOnIcon = () => (
   <svg
@@ -38,6 +37,7 @@ const MicOffIcon = () => (
 
 const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListeningChange }) => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const isRecognitionActiveRef = useRef<boolean>(false);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -47,31 +47,72 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, listening, onListenin
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false; // stop automatically after speaking
+    recognition.continuous = false;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = event.results[0][0].transcript;
       onResult(transcript);
-      onListeningChange(false); // auto stop mic after speech
+      isRecognitionActiveRef.current = false;
+      onListeningChange(false);
     };
 
-    recognition.onstart = () => onListeningChange(true);
-    recognition.onend = () => onListeningChange(false);
+    recognition.onstart = () => {
+      isRecognitionActiveRef.current = true;
+      onListeningChange(true);
+    };
+
+    recognition.onend = () => {
+      isRecognitionActiveRef.current = false;
+      onListeningChange(false);
+    };
+
+    recognition.onerror = (event: ErrorEvent) => {
+      console.error('Speech recognition error:', event.error);
+      isRecognitionActiveRef.current = false;
+      onListeningChange(false);
+    };
 
     recognitionRef.current = recognition;
+
+    // Cleanup function
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (error) {
+          console.error('Error stopping recognition:', error);
+        }
+      }
+    };
   }, [onResult, onListeningChange]);
 
   useEffect(() => {
-    if (listening) {
-      recognitionRef.current?.start();
-    } else {
-      recognitionRef.current?.stop();
+    if (listening && !isRecognitionActiveRef.current) {
+      try {
+        recognitionRef.current?.start();
+      } catch (error) {
+        console.error('Error starting recognition:', error);
+        onListeningChange(false);
+      }
+    } else if (!listening && isRecognitionActiveRef.current) {
+      try {
+        recognitionRef.current?.stop();
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
     }
-  }, [listening]);
+  }, [listening, onListeningChange]);
 
   const toggleListening = () => {
+    if (isRecognitionActiveRef.current) {
+      try {
+        recognitionRef.current?.stop();
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
+    }
     onListeningChange(!listening);
   };
 
